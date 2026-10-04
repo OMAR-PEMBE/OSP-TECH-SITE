@@ -10,6 +10,7 @@ Guidance for AI coding assistants (Claude Code, Cursor, Copilot, etc.) and any c
 ## 1. What this project is (context)
 
 One **Next.js (App Router, TypeScript)** app serving two surfaces:
+
 - **Public site** — fast, mobile-first, 3D-animated, drives WhatsApp leads. Mostly cached (ISR).
 - **OSP Admin** (`/admin`) — login-protected dashboard for content, projects, reminders, finance. Dynamic, private.
 

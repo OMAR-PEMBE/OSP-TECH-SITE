@@ -1,0 +1,241 @@
+@import "tailwindcss";
+
+/* ==========================================================================
+   OSP Tech — design tokens
+   This file is the SINGLE place in the codebase where a raw hex value may
+   appear (agents.md §2.1, UI-UX.md §2.1, architecture.md §4a).
+   `@theme` emits each token as a :root custom property AND generates the
+   matching Tailwind utility, so the CSS variables and the Tailwind classes
+   can never drift apart.
+   ========================================================================== */
+
+@theme {
+  /* --- Colour -------------------------------------------------------------
+     The default Tailwind palette is wiped (`--color-*: initial`) so that an
+     off-brand utility such as `bg-slate-400` or `text-sky-600` simply does
+     not exist. Only the 7 OSP tokens plus the muted functional state
+     colours are available. This is FR-B1 enforced by the build. */
+  --color-*: initial;
+
+  --color-transparent: transparent;
+  --color-current: currentColor;
+
+  /* The 7 OSP brand colours (UI-UX.md §2.1) */
+  --color-blue: #3871fc; /* logo, wordmark, headlines 24px+, blocks, primary buttons */
+  --color-blue-strong: #2457d6; /* small links + button text on white (AA) */
+  --color-teal: #04bcc8; /* ACCENT ONLY — one keyword, a line, the slash */
+  --color-navy: #081b33; /* dark grounds, logo bars, body text */
+  --color-cloud: #f3f6fb; /* light section backgrounds */
+  --color-slate: #5b6576; /* secondary text */
+  --color-white: #ffffff; /* primary light ground */
+
+  /* Functional UI state colours (UI-UX.md §2.4) — deliberately muted so they
+     never compete with brand blue/teal. Not part of the marketing palette. */
+  --color-success: #1ca05c;
+  --color-warning: #e3a008;
+  --color-danger: #e5484d;
+  --color-border: #e3e8f0;
+
+  /* AA-safe text versions of the state colours.
+     UI-UX.md 2.4 keeps the state colours muted so they never compete with
+     brand blue and teal — but muted means low contrast, and as small text on
+     white none of the three clears the 4.5:1 AA floor (success 3.37, warning
+     2.26, danger 3.91). These are the same hues darkened until they pass, and
+     they are what text uses. The originals stay for fills, borders, icons and
+     pills, where the 3:1 non-text threshold applies and the muted tone is the
+     point. Flagged for a UI-UX.md amendment. */
+  --color-success-text: #167d48; /* 5.17:1 on white, 4.54:1 on its tint */
+  --color-warning-text: #906505; /* 5.19:1 on white, 4.62:1 on its tint */
+  --color-danger-text: #bf3c40; /* 5.34:1 on white, 4.57:1 on its tint */
+
+  /* WhatsApp brand green — functional affordance only (UI-UX.md §7) */
+  --color-whatsapp: #25d366;
+
+  /* --- Typography ---------------------------------------------------------
+     One family: Poppins, loaded once via next/font in app/layout.tsx and
+     exposed as --font-poppins. Arial is the documented fallback. */
+  --font-sans: var(--font-poppins), Arial, Helvetica, sans-serif;
+
+  --font-weight-body: 400;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+  --font-weight-display: 800;
+
+  /* Type scale (UI-UX.md §3.1). Display and h1 use clamp() so they step down
+     ~30% on a 360px phone (display-xl 56px -> 38px) without a breakpoint
+     jump, which is what §3.1 asks for. */
+  --text-display-xl: clamp(2.375rem, 6.5vw, 3.5rem);
+  --text-display-xl--line-height: 1.05;
+  --text-display-l: clamp(1.75rem, 5vw, 2.5rem);
+  --text-display-l--line-height: 1.1;
+  --text-h1: clamp(1.5rem, 4vw, 2rem);
+  --text-h1--line-height: 1.15;
+  --text-h2: 1.5rem;
+  --text-h2--line-height: 1.2;
+  --text-h3: 1.25rem;
+  --text-h3--line-height: 1.3;
+  --text-body-lg: 1.125rem;
+  --text-body-lg--line-height: 1.6;
+  --text-body: 1rem;
+  --text-body--line-height: 1.6;
+  --text-small: 0.875rem;
+  --text-small--line-height: 1.5;
+  --text-label: 0.75rem;
+  --text-label--line-height: 1.4;
+  --text-label--letter-spacing: 0.06em;
+  --text-label--font-weight: 600;
+
+  /* --- Shape (UI-UX.md §6) ----------------------------------------------- */
+  --radius-card: 14px; /* cards + buttons — the doc's `--radius` */
+  --radius-input: 10px;
+  --radius-pill: 9999px;
+
+  /* Soft elevation only — never hard or neon */
+  --shadow-soft: 0 8px 24px
+    color-mix(in srgb, var(--color-navy) 8%, transparent);
+
+  /* --- Breakpoints (UI-UX.md §6) ----------------------------------------
+     640 / 768 / 1024 / 1280 are Tailwind defaults already; 360 is ours. */
+  --breakpoint-xs: 360px;
+
+  /* --- Layout ----------------------------------------------------------- */
+  --container-content: 1200px; /* max content width */
+}
+
+/* The doc refers to a single `--radius`; keep the alias so code written
+   against architecture.md §4a resolves. */
+:root {
+  --radius: var(--radius-card);
+
+  /* Focus ring colour. Blue-Strong clears 3:1 against white for non-text
+     UI; on navy it does not, so .surface-navy flips it to teal (7.4:1). */
+  --color-focus: var(--color-blue-strong);
+}
+
+@layer base {
+  body {
+    background-color: var(--color-white);
+    color: var(--color-navy);
+    font-family: var(--font-sans);
+    font-weight: var(--font-weight-body);
+    font-size: var(--text-body);
+    line-height: var(--text-body--line-height);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Visible keyboard focus everywhere (NFR-4). */
+  :focus-visible {
+    outline: 3px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+
+  /* Never allow horizontal scroll 360px -> desktop (NFR-3). */
+  html,
+  body {
+    overflow-x: clip;
+  }
+}
+
+@layer components {
+  /* Dark brand ground. Owns the on-navy focus colour so every interactive
+     child inside a navy section is automatically accessible. */
+  .surface-navy {
+    background-color: var(--color-navy);
+    color: var(--color-white);
+    --color-focus: var(--color-teal);
+  }
+}
+
+/* Honour prefers-reduced-motion globally (agents.md §2.7). The hero swaps to
+   its static tier separately; this is the blanket safety net. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ==========================================================================
+   Hero surfaces
+   The navy hero's static and "light" tiers are pure CSS so they cost no
+   JavaScript and paint with the document (architecture.md §8). They live here
+   rather than in the component because they are brand surface treatments
+   built from the colour tokens.
+   ========================================================================== */
+
+@layer components {
+  /* Tier 1 of 3: static. Always painted, server-rendered, no JS. A navy
+     ground lifted by a blue glow and a teal edge — the 60/30/10 ratio. */
+  .hero-glow {
+    background-image:
+      radial-gradient(
+        120% 90% at 78% 18%,
+        color-mix(in srgb, var(--color-blue) 42%, transparent) 0%,
+        transparent 62%
+      ),
+      radial-gradient(
+        90% 70% at 8% 92%,
+        color-mix(in srgb, var(--color-teal) 16%, transparent) 0%,
+        transparent 58%
+      );
+  }
+
+  /* Tier 2 of 3: light. The same markup as tier 1, drifting slowly. Replaces
+     the 3D scene on low-memory devices and slow connections. The tier is set
+     as an attribute on the hero section by hero-visual.tsx, so animating it
+     adds no DOM and keeps the layout at one 60 degree slash. */
+  [data-hero-tier="light"] .hero-glow {
+    animation: osp-hero-drift 18s ease-in-out infinite alternate;
+  }
+
+  [data-hero-tier="light"] .hero-slash {
+    animation: osp-slash-drift 14s ease-in-out infinite alternate;
+  }
+}
+
+@keyframes osp-hero-drift {
+  from {
+    background-position:
+      0% 0%,
+      0% 100%;
+    background-size:
+      100% 100%,
+      100% 100%;
+  }
+  to {
+    background-position:
+      12% 6%,
+      -8% 94%;
+    background-size:
+      118% 112%,
+      112% 108%;
+  }
+}
+
+@keyframes osp-slash-drift {
+  from {
+    transform: translate3d(0, 0, 0);
+    opacity: 0.55;
+  }
+  to {
+    transform: translate3d(-4%, -2%, 0);
+    opacity: 0.8;
+  }
+}
+
+/* FAB attention pulse — a ring that expands and fades, leaving the tap target
+   itself completely still (prd.md 5.1). */
+@keyframes osp-fab-pulse {
+  from {
+    transform: scale(1);
+    opacity: 0.55;
+  }
+  to {
+    transform: scale(1.75);
+    opacity: 0;
+  }
+}
