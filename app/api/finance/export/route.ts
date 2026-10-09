@@ -6,7 +6,7 @@ import {
   listIncome,
   toPaymentMethod,
 } from "@/lib/db/business";
-import { checkRateLimit } from "@/lib/rate-limit";
+import { EXPORT_RULES, checkRateLimit } from "@/lib/rate-limit";
 import { formatDate, formatTzs } from "@/lib/format";
 import { PAYMENT_METHOD_LABELS } from "@/lib/validation/business";
 import { BRAND_HEX } from "@/lib/brand/tokens";
@@ -23,9 +23,6 @@ import { BRAND_HEX } from "@/lib/brand/tokens";
  * RLS refuses the rows underneath besides.
  */
 
-/** API.md 6: 30 per hour per user. */
-const EXPORT_RULES = [{ limit: 30, windowMs: 60 * 60 * 1000 }];
-
 export async function GET(request: NextRequest) {
   const session = await getOwnerSession();
   if (!session) {
@@ -34,7 +31,7 @@ export async function GET(request: NextRequest) {
     return new NextResponse("Not found", { status: 404 });
   }
 
-  const { allowed, retryAfterSeconds } = checkRateLimit(
+  const { allowed, retryAfterSeconds } = await checkRateLimit(
     `export:${session.userId}`,
     EXPORT_RULES,
   );

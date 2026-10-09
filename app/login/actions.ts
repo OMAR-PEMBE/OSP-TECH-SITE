@@ -3,9 +3,10 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { loginSchema } from "@/lib/validation/auth";
-import { checkRateLimit } from "@/lib/rate-limit";
+import { LOGIN_RULES, checkRateLimit } from "@/lib/rate-limit";
 import { getRequestIp } from "@/lib/request-ip";
 import { type ActionResult, err } from "@/lib/types/action";
+import { safeNextPath } from "@/lib/auth/safe-next";
 
 /**
  * Sign in (FR-A1, API.md 4).
@@ -17,9 +18,6 @@ import { type ActionResult, err } from "@/lib/types/action";
  * On success this redirects rather than returning, so there is no window in
  * which the browser holds a session but still shows the login form.
  */
-
-/** API.md 6: 10 per 15 minutes per IP, then backoff. */
-const LOGIN_RULES = [{ limit: 10, windowMs: 15 * 60 * 1000 }];
 
 const GENERIC_ERROR = "That email or password is not right.";
 
@@ -35,7 +33,7 @@ export async function signIn(formData: FormData): Promise<ActionResult<never>> {
   }
 
   const ip = await getRequestIp();
-  const { allowed } = checkRateLimit(`login:${ip}`, LOGIN_RULES);
+  const { allowed } = await checkRateLimit(`login:${ip}`, LOGIN_RULES);
   if (!allowed) {
     return err(
       "RATE_LIMITED",
@@ -56,13 +54,9 @@ export async function signIn(formData: FormData): Promise<ActionResult<never>> {
     return err("UNAUTHENTICATED", GENERIC_ERROR);
   }
 
-  /* Only same-origin paths. Taking `next` straight from the query string
-     would make this an open redirect: /login?next=https://evil.example. */
-  const next = parsed.data.next;
-  const safeNext =
-    next && next.startsWith("/") && !next.startsWith("//") ? next : "/admin";
-
-  redirect(safeNext);
+  /* Only same-origin paths — see safeNextPath for why a prefix check is not
+     enough. */
+  redirect(safeNextPath(parsed.data.next));
 }
 
 export async function signOut(): Promise<void> {

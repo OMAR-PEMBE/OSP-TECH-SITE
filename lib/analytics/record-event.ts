@@ -35,7 +35,7 @@ export async function recordEvent(
     if (!EVENT_TYPES.includes(input.type)) return ok(null);
 
     const ip = await getRequestIp();
-    const { allowed } = checkRateLimit(`event:${ip}`, EVENT_RULES);
+    const { allowed } = await checkRateLimit(`event:${ip}`, EVENT_RULES);
     /* Over the limit: drop silently, exactly as API.md 3.2 specifies. */
     if (!allowed) return ok(null);
 

@@ -1,6 +1,7 @@
 import "server-only";
 
 import { createClient } from "@/lib/supabase/server";
+import { addDays, darStartOfDay, toDarDateInput } from "@/lib/format";
 
 /**
  * Clients, projects, reminders and finance reads (API.md 4.3-4.6).
@@ -31,10 +32,18 @@ export async function listClients(search?: string): Promise<Client[]> {
 
   let query = supabase.from("clients").select("*").order("name");
 
-  if (search?.trim()) {
-    /* Escape the PostgREST wildcards so a literal % typed into the search box
-       does not turn into "match everything". */
-    const term = search.trim().replace(/[%_]/g, "\\$&");
+  /* The term is interpolated into a PostgREST filter string, where `,` `(`
+     `)` `"` `\` are syntax and `%` `_` `*` are wildcards. Escaping only the
+     wildcards would still let a comma or parenthesis start a new filter
+     clause. None of those characters matters for finding a client by name,
+     business or phone, so they are replaced with spaces rather than escaped
+     through two layers (PostgREST quoting, then LIKE). */
+  const term = search
+    ?.replace(/[,()"\\%_*:]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (term) {
     query = query.or(
       `name.ilike.%${term}%,business_name.ilike.%${term}%,phone.ilike.%${term}%`,
     );
@@ -124,8 +133,9 @@ type ProjectRow = {
 function isOverdue(deadline: string | null, status: string): boolean {
   if (!deadline) return false;
   if (status === "completed" || status === "cancelled") return false;
-  /* Date-only comparison: a project due today is not overdue until tomorrow. */
-  const today = new Date().toISOString().slice(0, 10);
+  /* Date-only comparison: a project due today is not overdue until tomorrow.
+     "Today" in Dar es Salaam — the UTC date is yesterday until 03:00 EAT. */
+  const today = toDarDateInput();
   return deadline < today;
 }
 
@@ -264,15 +274,15 @@ export function bucketFor(dueAt: string, done: boolean): ReminderBucket {
   const due = new Date(dueAt);
   const now = new Date();
 
-  const endOfToday = new Date(now);
-  endOfToday.setHours(23, 59, 59, 999);
-
-  const endOfWeek = new Date(endOfToday);
-  endOfWeek.setDate(endOfWeek.getDate() + 7);
+  /* Day boundaries on the Dar es Salaam calendar. `setHours` would use the
+     server's zone — UTC on Vercel — and call 01:00 tomorrow "today". */
+  const today = toDarDateInput(now);
+  const startOfTomorrow = darStartOfDay(addDays(today, 1));
+  const startOfWeekAfter = darStartOfDay(addDays(today, 8));
 
   if (due < now) return "overdue";
-  if (due <= endOfToday) return "today";
-  if (due <= endOfWeek) return "week";
+  if (due < startOfTomorrow) return "today";
+  if (due < startOfWeekAfter) return "week";
   return "later";
 }
 

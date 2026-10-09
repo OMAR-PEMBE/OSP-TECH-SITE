@@ -695,6 +695,10 @@ export type Database = {
     };
     Functions: {
       is_owner: { Args: Record<PropertyKey, never>; Returns: boolean };
+      rate_limit_hit: {
+        Args: { p_key: string; p_limit: number; p_window_seconds: number };
+        Returns: { allowed: boolean; retry_after_seconds: number }[];
+      };
     };
     Enums: {
       event_type: "page_view" | "whatsapp_click" | "contact_submit";

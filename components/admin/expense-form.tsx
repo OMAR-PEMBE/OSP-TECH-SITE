@@ -11,6 +11,7 @@ import {
   REPEAT_LABELS,
 } from "@/lib/validation/business";
 import type { ExpenseCategory, ExpenseEntry } from "@/lib/db/business";
+import { toDarDateInput } from "@/lib/format";
 
 /** Record an expense (FR-A13). */
 export function ExpenseForm({
@@ -20,7 +21,8 @@ export function ExpenseForm({
   entry?: ExpenseEntry;
   categories: ExpenseCategory[];
 }) {
-  const today = new Date().toISOString().slice(0, 10);
+  /* Dar es Salaam's date: the UTC date is still yesterday until 03:00 EAT. */
+  const today = toDarDateInput();
 
   return (
     <EntityForm

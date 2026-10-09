@@ -13,7 +13,7 @@ import {
   listProjects,
   listReminders,
 } from "@/lib/db/business";
-import { formatDateShort, formatTzs } from "@/lib/format";
+import { darMonthStart, formatDateShort, formatTzs } from "@/lib/format";
 import { PROJECT_STATUS_LABELS } from "@/lib/validation/business";
 
 /**
@@ -27,11 +27,8 @@ export const metadata = { title: "Dashboard" };
 export default async function AdminDashboardPage() {
   const session = await requireOwner();
 
-  /* This month, in the owner's timezone. */
-  const now = new Date();
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
-    .toISOString()
-    .slice(0, 10);
+  /* This month, in Dar es Salaam — independent of the server's timezone. */
+  const monthStart = darMonthStart();
 
   const [
     newMessages,

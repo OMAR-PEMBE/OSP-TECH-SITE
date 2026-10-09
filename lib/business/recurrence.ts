@@ -6,39 +6,39 @@
  * function the server calls internally.
  */
 
+/** East Africa Time is a fixed UTC+3 with no daylight saving. */
+const DAR_OFFSET_MS = 3 * 60 * 60 * 1000;
+
 /**
  * The next due date for a repeating item.
  *
- * Month arithmetic is clamped. `setMonth` on 31 January rolls forward into
- * March, so "every month" on the 31st would skip February entirely; pinning
- * to the last valid day of the target month keeps the series monthly.
+ * Calendar arithmetic is done on the Dar es Salaam wall clock, not the
+ * server's: "every month on the 1st at 01:00" is the 30th/31st at 22:00 in
+ * UTC, and stepping the UTC calendar would land on the wrong day of the month.
+ * The instant is shifted into EAT, stepped with the UTC accessors (which then
+ * read EAT fields, independent of the server's own zone), and shifted back.
+ *
+ * Month arithmetic is clamped. Adding a month to 31 January would roll into
+ * March and skip February entirely; pinning to the last valid day of the
+ * target month keeps the series monthly.
  */
 export function nextOccurrence(dueAt: string, rule: string): string {
-  const date = new Date(dueAt);
+  const wall = new Date(new Date(dueAt).getTime() + DAR_OFFSET_MS);
 
   if (rule === "daily") {
-    date.setDate(date.getDate() + 1);
-    return date.toISOString();
-  }
-
-  if (rule === "weekly") {
-    date.setDate(date.getDate() + 7);
-    return date.toISOString();
-  }
-
-  if (rule === "monthly") {
-    const day = date.getDate();
+    wall.setUTCDate(wall.getUTCDate() + 1);
+  } else if (rule === "weekly") {
+    wall.setUTCDate(wall.getUTCDate() + 7);
+  } else if (rule === "monthly") {
+    const day = wall.getUTCDate();
     /* Move to the 1st first, so adding a month cannot overflow. */
-    date.setDate(1);
-    date.setMonth(date.getMonth() + 1);
+    wall.setUTCDate(1);
+    wall.setUTCMonth(wall.getUTCMonth() + 1);
     const lastDay = new Date(
-      date.getFullYear(),
-      date.getMonth() + 1,
-      0,
-    ).getDate();
-    date.setDate(Math.min(day, lastDay));
-    return date.toISOString();
+      Date.UTC(wall.getUTCFullYear(), wall.getUTCMonth() + 1, 0),
+    ).getUTCDate();
+    wall.setUTCDate(Math.min(day, lastDay));
   }
 
-  return date.toISOString();
+  return new Date(wall.getTime() - DAR_OFFSET_MS).toISOString();
 }

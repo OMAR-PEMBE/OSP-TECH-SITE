@@ -77,7 +77,7 @@ export async function submitContactMessage(
     }
 
     const ip = await getRequestIp();
-    const { allowed } = checkRateLimit(`contact:${ip}`, CONTACT_RULES);
+    const { allowed } = await checkRateLimit(`contact:${ip}`, CONTACT_RULES);
     if (!allowed) {
       return err(
         "RATE_LIMITED",

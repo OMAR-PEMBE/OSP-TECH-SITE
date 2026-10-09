@@ -286,12 +286,25 @@ export async function completeReminder(
 
     if (!reminder) return err("NOT_FOUND", "That reminder no longer exists.");
 
-    const { error } = await supabase
+    /* Conditional on `done = false`, so the flip is a compare-and-set. A
+       double click — or two tabs — sends two of these; only one can match
+       the row, and only that one goes on to create the next occurrence.
+       Without the guard both would, and the series would fork in two. */
+    const { data: flipped, error } = await supabase
       .from("reminders")
       .update({ done: true })
-      .eq("id", id);
+      .eq("id", id)
+      .eq("done", false)
+      .select("id")
+      .maybeSingle();
 
     if (error) return dbError(error);
+
+    /* Already done by another request: nothing more to do. */
+    if (!flipped) {
+      revalidatePath("/admin/reminders");
+      return ok(null);
+    }
 
     if (reminder.repeat_rule !== "none") {
       const next = nextOccurrence(reminder.due_at, reminder.repeat_rule);

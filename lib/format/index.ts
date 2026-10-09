@@ -71,6 +71,85 @@ export function toDateTimeAttr(value: string | Date): string {
   return toDate(value).toISOString();
 }
 
+/* ------------------------------------------------- Dar es Salaam wall time */
+
+/**
+ * East Africa Time is a fixed UTC+3 — Tanzania has not observed daylight
+ * saving since the 1960s — so a constant offset is exact, and needs no tz
+ * database on the server.
+ *
+ * Everything below exists because `new Date().getHours()`, `setHours()` and
+ * `toISOString().slice(0, 10)` all answer in the *server's* timezone, which on
+ * Vercel is UTC. Used for "today" or for a time the owner typed, that is three
+ * hours wrong in Morogoro.
+ */
+export const DAR_UTC_OFFSET = "+03:00";
+const DAR_OFFSET_MS = 3 * 60 * 60 * 1000;
+
+/** The calendar fields of an instant, as a clock in Dar es Salaam reads them. */
+function darFields(date: Date) {
+  /* Shift by the offset and read the UTC fields: exact for a fixed offset,
+     and identical on any server whatever its own timezone. */
+  const shifted = new Date(date.getTime() + DAR_OFFSET_MS);
+  return {
+    year: shifted.getUTCFullYear(),
+    month: shifted.getUTCMonth() + 1,
+    day: shifted.getUTCDate(),
+    hour: shifted.getUTCHours(),
+    minute: shifted.getUTCMinutes(),
+  };
+}
+
+const pad2 = (n: number) => String(n).padStart(2, "0");
+
+/** `Date` → `"YYYY-MM-DD"`, the date in Dar es Salaam. For `<input type=date>`. */
+export function toDarDateInput(date: Date = new Date()): string {
+  const f = darFields(date);
+  return `${f.year}-${pad2(f.month)}-${pad2(f.day)}`;
+}
+
+/** `Date` → `"YYYY-MM-DDTHH:mm"` in Dar es Salaam. For `datetime-local`. */
+export function toDarDateTimeInput(date: Date): string {
+  const f = darFields(date);
+  return `${toDarDateInput(date)}T${pad2(f.hour)}:${pad2(f.minute)}`;
+}
+
+/** First day of the current month in Dar es Salaam, as `"YYYY-MM-01"`. */
+export function darMonthStart(date: Date = new Date()): string {
+  const f = darFields(date);
+  return `${f.year}-${pad2(f.month)}-01`;
+}
+
+/**
+ * The instant a Dar es Salaam wall-clock time names.
+ *
+ * `datetime-local` posts `"2026-10-04T14:30"` with no zone, and
+ * `new Date(that)` would read it in the server's zone. This pins it to EAT.
+ * Returns null for anything that is not that exact shape, so a caller cannot
+ * silently fall back to the server-local reading.
+ */
+export function parseDarDateTime(value: string): Date | null {
+  const match = /^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?$/.exec(
+    value.trim(),
+  );
+  if (!match) return null;
+  const [, day, hh, mm, ss = "00"] = match;
+  const date = new Date(`${day}T${hh}:${mm}:${ss}${DAR_UTC_OFFSET}`);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+/** Midnight at the start of the given `"YYYY-MM-DD"` day in Dar es Salaam. */
+export function darStartOfDay(day: string): Date {
+  return new Date(`${day}T00:00:00${DAR_UTC_OFFSET}`);
+}
+
+/** Adds whole calendar days to a `"YYYY-MM-DD"` string. */
+export function addDays(day: string, days: number): string {
+  const date = new Date(`${day}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
 /**
  * A whole-TZS amount, typed for a `bigint` column.
  *

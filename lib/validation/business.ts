@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { parseDarDateTime } from "@/lib/format";
 
 /**
  * Clients, projects, reminders and finance schemas (API.md 4.3-4.6).
@@ -46,7 +47,10 @@ export const tzsAmountSchema = z
   .refine((v) => /^\d+$/.test(v), {
     message: "Enter whole shillings — digits only, no decimals.",
   })
-  .refine((v) => BigInt(v) <= 9_223_372_036_854_775_807n, {
+  /* Zod 4 keeps running refinements after one fails, so this one must not
+     assume the digits check passed — `BigInt("1.5")` throws, which would turn
+     a field error into a 500. Non-digit input is already reported above. */
+  .refine((v) => !/^\d+$/.test(v) || BigInt(v) <= 9_223_372_036_854_775_807n, {
     message: "That amount is too large.",
   })
   .transform((v) => BigInt(v).toString());
@@ -177,17 +181,18 @@ export const reminderSchema = z.object({
   description: optionalText(2000),
   /**
    * `datetime-local` sends "2026-10-04T14:30" with no timezone. It is read as
-   * the owner's local time, which is the only sensible reading of a time they
-   * just typed, and stored as a timestamptz.
+   * Dar es Salaam time — what the owner means when they type it — and stored
+   * as a timestamptz. Never `new Date(v)`: that reads it in the server's zone,
+   * which is UTC on Vercel, and every save would push the reminder 3h later.
    */
   due_at: z
     .string()
     .trim()
     .min(1, "Choose when this is due.")
-    .refine((v) => !Number.isNaN(new Date(v).getTime()), {
+    .refine((v) => parseDarDateTime(v) !== null, {
       message: "That date could not be read.",
     })
-    .transform((v) => new Date(v).toISOString()),
+    .transform((v) => parseDarDateTime(v)!.toISOString()),
   repeat_rule: repeatRuleSchema.default("none"),
   project_id: z
     .string()

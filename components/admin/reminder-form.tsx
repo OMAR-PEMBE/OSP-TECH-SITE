@@ -12,12 +12,18 @@ import {
 import { saveReminder } from "@/app/actions/business";
 import { REPEAT_LABELS } from "@/lib/validation/business";
 import type { Client, Project, Reminder } from "@/lib/db/business";
+import {
+  addDays,
+  parseDarDateTime,
+  toDarDateInput,
+  toDarDateTimeInput,
+} from "@/lib/format";
 
 /**
  * Create/edit a reminder (FR-A10).
  *
  * The due field is `datetime-local`, whose value has no timezone — it is read
- * as the owner's local time, which is what they mean when they type it, and
+ * as Dar es Salaam time, which is what the owner means when they type it, and
  * stored as a timestamptz.
  */
 export function ReminderForm({
@@ -29,11 +35,13 @@ export function ReminderForm({
   projects: Project[];
   clients: Client[];
 }) {
-  /* `datetime-local` wants "YYYY-MM-DDTHH:mm" in local time. Slicing the ISO
-     string would show UTC, putting the time three hours out in Tanzania. */
-  const dueLocal = reminder
-    ? toLocalInputValue(new Date(reminder.dueAt))
-    : toLocalInputValue(defaultDue());
+  /* `datetime-local` wants "YYYY-MM-DDTHH:mm". It is shown in Dar es Salaam
+     time explicitly — not the browser's or the server's zone — because that
+     is how the action reads it back; any other zone would drift the time on
+     every save, and would differ between the server render and hydration. */
+  const dueLocal = toDarDateTimeInput(
+    reminder ? new Date(reminder.dueAt) : defaultDue(),
+  );
 
   return (
     <EntityForm
@@ -121,19 +129,8 @@ export function ReminderForm({
   );
 }
 
-/** Tomorrow at 09:00 — a sensible default for a reminder someone just made. */
+/** Tomorrow at 09:00 in Dar es Salaam — a sensible default for a new reminder. */
 function defaultDue(): Date {
-  const date = new Date();
-  date.setDate(date.getDate() + 1);
-  date.setHours(9, 0, 0, 0);
-  return date;
-}
-
-/** `Date` → "YYYY-MM-DDTHH:mm" in LOCAL time, for a datetime-local input. */
-function toLocalInputValue(date: Date): string {
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return (
-    `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` +
-    `T${pad(date.getHours())}:${pad(date.getMinutes())}`
-  );
+  const tomorrow = addDays(toDarDateInput(), 1);
+  return parseDarDateTime(`${tomorrow}T09:00`)!;
 }

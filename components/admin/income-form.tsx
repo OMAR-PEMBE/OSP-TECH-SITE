@@ -7,6 +7,7 @@ import { SelectField, TextAreaField, TextField } from "@/components/admin/form";
 import { saveIncome } from "@/app/actions/business";
 import { PAYMENT_METHOD_LABELS } from "@/lib/validation/business";
 import type { Client, IncomeEntry, Project } from "@/lib/db/business";
+import { toDarDateInput } from "@/lib/format";
 
 /** Record income (FR-A12). */
 export function IncomeForm({
@@ -18,7 +19,8 @@ export function IncomeForm({
   clients: Client[];
   projects: Project[];
 }) {
-  const today = new Date().toISOString().slice(0, 10);
+  /* Dar es Salaam's date: the UTC date is still yesterday until 03:00 EAT. */
+  const today = toDarDateInput();
 
   return (
     <EntityForm

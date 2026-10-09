@@ -40,6 +40,38 @@ function toObject(formData: FormData): Record<string, unknown> {
   };
 }
 
+type Supabase = Parameters<Parameters<typeof withOwner>[0]>[0]["supabase"];
+type SlugTable = "products" | "portfolio_items" | "posts";
+
+/**
+ * The slug a row has right now, before an update or delete changes it.
+ *
+ * Detail pages are cached per slug. Renaming `wifi-billing` to `wifi` and
+ * revalidating only `/products/wifi` would leave the old URL serving the
+ * stale page until the hourly window ran out — and a deleted item would keep
+ * its public page the same way. So the old path is revalidated too.
+ */
+async function currentSlug(
+  supabase: Supabase,
+  table: SlugTable,
+  id: string | null,
+): Promise<string | null> {
+  if (!id) return null;
+  const { data } = await supabase
+    .from(table)
+    .select("slug")
+    .eq("id", id)
+    .maybeSingle();
+  return data?.slug ?? null;
+}
+
+/** Revalidates `/<prefix>/<slug>` for each distinct non-null slug. */
+function revalidateSlugs(prefix: string, ...slugs: (string | null)[]) {
+  for (const slug of new Set(slugs)) {
+    if (slug) revalidatePath(`${prefix}/${slug}`);
+  }
+}
+
 /* ----------------------------------------------------------------- services */
 
 export async function saveService(
@@ -109,6 +141,8 @@ export async function saveProduct(
       );
     }
 
+    const oldSlug = await currentSlug(supabase, "products", id);
+
     const query = id
       ? supabase.from("products").update(parsed.data).eq("id", id).select("id")
       : supabase.from("products").insert(parsed.data).select("id");
@@ -118,16 +152,18 @@ export async function saveProduct(
     if (!data) return err("NOT_FOUND", "That product no longer exists.");
 
     revalidateFor("products", ["/admin/products"]);
-    revalidatePath(`/products/${parsed.data.slug}`);
+    revalidateSlugs("/products", parsed.data.slug, oldSlug);
     return ok({ id: data.id });
   });
 }
 
 export async function deleteProduct(id: string): Promise<ActionResult<null>> {
   return withOwner(async ({ supabase }) => {
+    const oldSlug = await currentSlug(supabase, "products", id);
     const { error } = await supabase.from("products").delete().eq("id", id);
     if (error) return dbError(error);
     revalidateFor("products", ["/admin/products"]);
+    revalidateSlugs("/products", oldSlug);
     return ok(null);
   });
 }
@@ -137,12 +173,16 @@ export async function toggleProductVisible(
   visible: boolean,
 ): Promise<ActionResult<null>> {
   return withOwner(async ({ supabase }) => {
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from("products")
       .update({ visible })
-      .eq("id", id);
+      .eq("id", id)
+      .select("slug")
+      .maybeSingle();
     if (error) return dbError(error);
     revalidateFor("products", ["/admin/products"]);
+    /* Hiding must take the detail page down too, not just the listings. */
+    revalidateSlugs("/products", data?.slug ?? null);
     return ok(null);
   });
 }
@@ -163,6 +203,8 @@ export async function savePortfolioItem(
       );
     }
 
+    const oldSlug = await currentSlug(supabase, "portfolio_items", id);
+
     const query = id
       ? supabase
           .from("portfolio_items")
@@ -176,7 +218,7 @@ export async function savePortfolioItem(
     if (!data) return err("NOT_FOUND", "That project no longer exists.");
 
     revalidateFor("portfolio_items", ["/admin/portfolio"]);
-    revalidatePath(`/portfolio/${parsed.data.slug}`);
+    revalidateSlugs("/portfolio", parsed.data.slug, oldSlug);
     return ok({ id: data.id });
   });
 }
@@ -185,12 +227,14 @@ export async function deletePortfolioItem(
   id: string,
 ): Promise<ActionResult<null>> {
   return withOwner(async ({ supabase }) => {
+    const oldSlug = await currentSlug(supabase, "portfolio_items", id);
     const { error } = await supabase
       .from("portfolio_items")
       .delete()
       .eq("id", id);
     if (error) return dbError(error);
     revalidateFor("portfolio_items", ["/admin/portfolio"]);
+    revalidateSlugs("/portfolio", oldSlug);
     return ok(null);
   });
 }
@@ -200,12 +244,16 @@ export async function togglePortfolioVisible(
   visible: boolean,
 ): Promise<ActionResult<null>> {
   return withOwner(async ({ supabase }) => {
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from("portfolio_items")
       .update({ visible })
-      .eq("id", id);
+      .eq("id", id)
+      .select("slug")
+      .maybeSingle();
     if (error) return dbError(error);
     revalidateFor("portfolio_items", ["/admin/portfolio"]);
+    /* Hiding must take the detail page down too, not just the listings. */
+    revalidateSlugs("/portfolio", data?.slug ?? null);
     return ok(null);
   });
 }
@@ -254,6 +302,8 @@ export async function savePost(
       author_id: userId,
     };
 
+    const oldSlug = await currentSlug(supabase, "posts", id);
+
     const query = id
       ? supabase.from("posts").update(values).eq("id", id).select("id")
       : supabase.from("posts").insert(values).select("id");
@@ -263,7 +313,7 @@ export async function savePost(
     if (!data) return err("NOT_FOUND", "That post no longer exists.");
 
     revalidateFor("posts", ["/admin/posts"]);
-    revalidatePath(`/blog/${parsed.data.slug}`);
+    revalidateSlugs("/blog", parsed.data.slug, oldSlug);
     return ok({ id: data.id });
   });
 }
@@ -325,9 +375,11 @@ export async function unpublishPost(id: string): Promise<ActionResult<null>> {
 
 export async function deletePost(id: string): Promise<ActionResult<null>> {
   return withOwner(async ({ supabase }) => {
+    const oldSlug = await currentSlug(supabase, "posts", id);
     const { error } = await supabase.from("posts").delete().eq("id", id);
     if (error) return dbError(error);
     revalidateFor("posts", ["/admin/posts"]);
+    revalidateSlugs("/blog", oldSlug);
     return ok(null);
   });
 }
